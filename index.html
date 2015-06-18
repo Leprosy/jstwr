@@ -1,0 +1,158 @@
+<!-- JSTWR -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <style></style>
+        <title>jstwr</title>
+        <script src="js/crafty.js"></script>
+    </head>
+    <body>
+        <div id="game"></div>
+
+        <script>
+/**
+ * Game logic 
+ */
+
+/* Some parameters */
+var Game = {};
+Game.size = 32;
+Game._path = [[50, 0], [200, 200], [350, 200], [0, 400]];
+Game.path = [];
+
+/* Entry point */
+window.onload = function() {
+    Crafty.init(Game.size * 20, Game.size * 20, "game");
+    Crafty.background("#002200");
+    Crafty.scene("loading");
+};
+
+
+
+
+/*
+ * Components
+ */
+Crafty.c("tCreep", {
+    speed: 1,
+
+    init: function() {
+        //Setup
+        this.addComponent("2D, Canvas, Color, Collision");
+        this.name = "oaw";
+        this.w = Game.size;
+        this.h = Game.size;
+        this.color("#0000FF");
+        this.origin("center");
+
+        //Set collision frame
+        this.collision();
+
+        //Put in position
+        this.x = Game.path[0].x;
+        this.y = Game.path[0].y;
+        this.nextPoint = 1;
+
+        //Start moving
+        this.bind('EnterFrame', this.update);
+    },
+
+    update: function(a, b, c) {
+        var point = Game.path[this.nextPoint];
+        console.log(point.x, point.y)
+        //Advance to the next point (TODO: precalculate and store)
+        var dx = this.x - point.x;
+        var dy = this.y - point.y;
+        var angle = Math.atan(dy/dx); // * 180 / Math.PI; // (r * 180 / pi)
+
+        this.x += this.speed * Math.cos(angle);
+        this.y += this.speed * Math.sin(angle);
+
+        //this.rotation = angle;
+        //console.log("a:", angle, "x,y:", this.x, this.y, "dx,dy:", dx, dy, point);
+
+        //Check path
+        var hit = this.hit("tPoint");
+
+        if (hit) { // && hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
+            if (hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
+                console.log("OK")
+                this.nextPoint++;
+
+                // Creep reached end of the path
+                if (this.nextPoint == Game.path.length) {
+                    this.destroy();
+                }
+            }
+        }
+    },
+
+    checkPoint: function(a) {
+        console.log(a);
+    }
+});
+
+
+
+
+/*
+ * Scenes
+ */
+// The loading screen
+Crafty.scene("loading", function() {
+    var text = Crafty.e("2D, Canvas, Text").attr({w: 0, h: 0, x: 0, y: 0})
+                     .text("Loading...")
+                     .textColor('#FFFFFF')
+
+    //Create path
+    for (i in Game._path) {
+        var point = Game._path[i];
+        point = Crafty.e("2D, Canvas, Color, Collision, tPoint")
+                      .collision()
+                      .attr({x: point[0], y: point[1], w: 5, h: 5})
+                      .color("#ffffff");
+        Game.path.push(point);
+    }
+
+    //Create creep
+    var Creep = Crafty.e("tCreep");
+    /* Loader...not yet
+    var loadObj = {
+        "audio": {
+            "miau": "snd/miau.mp3",
+            "rasgar": "snd/rasgar.mp3",
+            "music": "snd/elgato.mp3",
+            "fail": "snd/fail.mp3",
+            "win": "snd/win.mp3",
+            "gameover": "snd/gameover.mp3"
+        },
+        "images": ["img/gato2.png", "img/sprite.png", "img/floor.png", "img/coda.png", "img/broom.png"]
+        //"sprites": definition only valid for the callback of loader (why?)
+    };
+
+    /*Crafty.load(loadObj, function() {
+        // On load
+        // Create sprites
+        Crafty.sprite(Game.tile, "img/floor.png", { piso: [0,0] });
+        Crafty.sprite(Game.tile, "img/sprite.png", { cosas: [0,0] });
+        Crafty.sprite(Game.tile, "img/gato2.png", { gato: [0,0] });
+        Crafty.sprite(Game.tile, "img/coda.png", { coda: [0,0] });
+        Crafty.sprite(Game.tile, "img/broom.png", { broom: [0,0] });
+
+        // Ready, fire main menu
+        Crafty.audio.play("miau", 1);
+        Crafty.scene("menu");
+    }, function(e) {
+        // On progress
+        console.log(e);
+        text.text("Cargando " + Math.round(e.percent) + "%");
+    }, function(e) {
+        // On error
+        console.debug(e);
+    }); */
+});
+
+
+        </script>
+    </body>
+</html>
