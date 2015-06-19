@@ -59,11 +59,11 @@ Crafty.c("tCreep", {
 
     update: function(a, b, c) {
         var point = Game.path[this.nextPoint];
-        console.log(point.x, point.y)
+
         //Advance to the next point (TODO: precalculate and store)
-        var dx = this.x - point.x;
-        var dy = this.y - point.y;
-        var angle = Math.atan(dy/dx); // * 180 / Math.PI; // (r * 180 / pi)
+        var dx = point.x - this.x;
+        var dy = point.y - this.y;
+        var angle = Math.atan2(dy, dx); // * 180 / Math.PI; // (r * 180 / pi)
 
         this.x += this.speed * Math.cos(angle);
         this.y += this.speed * Math.sin(angle);
@@ -76,7 +76,6 @@ Crafty.c("tCreep", {
 
         if (hit) { // && hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
             if (hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
-                console.log("OK")
                 this.nextPoint++;
 
                 // Creep reached end of the path
