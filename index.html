@@ -34,28 +34,30 @@ window.onload = function() {
  * Components
  */
 Crafty.c("tCreep", {
-    speed: 1,
-
     init: function() {
         //Setup
         this.addComponent("2D, Canvas, Color");
-        this.name = "oaw";
+        this.origin("center");
         this.w = Game.size;
         this.h = Game.size;
-        this.color("#0000FF");
-        this.origin("center");
 
         //Put in position
         this.x = Game.path[0].x;
         this.y = Game.path[0].y;
         this.nextPoint = 1;
+    },
+
+    creep: function(data) {
+        this.name = data.name;
+        this.speed = data.speed;
+        this.color(data.color);
 
         //Start moving
         this.bind('EnterFrame', this.update);
         console.info("Creep '%s' released", this.name);
     },
 
-    update: function(a, b, c) {
+    update: function() {
         var point = Game.path[this.nextPoint];
 
         //Advance to the next point (TODO: precalculate and store)
@@ -78,10 +80,6 @@ Crafty.c("tCreep", {
                 this.destroy();
             }
         }
-    },
-
-    checkPoint: function(a) {
-        console.log(a);
     }
 });
 
@@ -102,12 +100,11 @@ Crafty.scene("loading", function() {
         var point = Game._path[i];
         point = Crafty.e("2D, Canvas, Color, tPoint")
                       .attr({x: point[0], y: point[1], w: 5, h: 5})
-                      .color("#ffffff");
+                      .color("#ffffff"); //debug mode
         Game.path.push(point);
     }
 
     //Create creep
-    var Creep = Crafty.e("tCreep");
     /* Loader...not yet
     var loadObj = {
         "audio": {
@@ -145,6 +142,20 @@ Crafty.scene("loading", function() {
 });
 
 
+/**
+ * Helpers
+ */
+function sendCreep(creepData, number, delay) {
+    if (typeof number == "undefined") number = 1;
+
+    console.info("Sending %s creeps...", number, creepData);
+
+    Crafty.e("Delay").delay(function() {
+        Crafty.e("tCreep").creep(creepData);
+    }, delay, number, function() {
+        console.info("Done sending %s", number, creepData);
+    });
+}
         </script>
     </body>
 </html>
