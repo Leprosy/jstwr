@@ -38,15 +38,12 @@ Crafty.c("tCreep", {
 
     init: function() {
         //Setup
-        this.addComponent("2D, Canvas, Color, Collision");
+        this.addComponent("2D, Canvas, Color");
         this.name = "oaw";
         this.w = Game.size;
         this.h = Game.size;
         this.color("#0000FF");
         this.origin("center");
-
-        //Set collision frame
-        this.collision();
 
         //Put in position
         this.x = Game.path[0].x;
@@ -55,6 +52,7 @@ Crafty.c("tCreep", {
 
         //Start moving
         this.bind('EnterFrame', this.update);
+        console.info("Creep '%s' released", this.name);
     },
 
     update: function(a, b, c) {
@@ -71,17 +69,13 @@ Crafty.c("tCreep", {
         //this.rotation = angle;
         //console.log("a:", angle, "x,y:", this.x, this.y, "dx,dy:", dx, dy, point);
 
-        //Check path
-        var hit = this.hit("tPoint");
+        if (this.intersect(point)) {
+            this.nextPoint++;
 
-        if (hit) { // && hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
-            if (hit[0].obj.x == point.x && hit[0].obj.y == point.y) {
-                this.nextPoint++;
-
-                // Creep reached end of the path
-                if (this.nextPoint == Game.path.length) {
-                    this.destroy();
-                }
+            // Creep reached end of the path
+            if (this.nextPoint == Game.path.length) {
+                console.info("Creep '%s' leaked", this.name);
+                this.destroy();
             }
         }
     },
@@ -106,8 +100,7 @@ Crafty.scene("loading", function() {
     //Create path
     for (i in Game._path) {
         var point = Game._path[i];
-        point = Crafty.e("2D, Canvas, Color, Collision, tPoint")
-                      .collision()
+        point = Crafty.e("2D, Canvas, Color, tPoint")
                       .attr({x: point[0], y: point[1], w: 5, h: 5})
                       .color("#ffffff");
         Game.path.push(point);
