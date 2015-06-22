@@ -17,8 +17,43 @@
 /* Some parameters */
 var Game = {};
 Game.size = 32;
-Game._path = [[50, 0], [200, 200], [350, 200], [0, 400]];
-Game.path = [];
+Game.version = 0.001;
+
+/**
+ * This is level data. Must be loaded from a JSON file/service
+ */
+Game.wave_num = 0;
+Game.wave_sub = 0;
+Game.path = [[50, 0], [200, 200], [350, 200], [0, 400]]; //Loaded from JSON
+Game.creeps = { //Loaded from JSON
+    "oawc": {
+        name: "Oaw",
+        hp: 20,
+        speed: 1,
+        color: "#ff0000"
+    },
+    "tldo": {
+        name: "Taldo",
+        hp: 40,
+        speed: 2,
+        color: "#ffff00"
+    },
+    "stld": {
+        name: "Super Taldo",
+        hp: 80,
+        speed: 3,
+        color: "#0000ff"
+    },
+};
+Game.waves = [ //Loaded from JSON
+    [{name: "oawc", total: 6, delay: 1000},
+     {name: "tldo", total: 5, delay: 800}],
+    
+    [{name: "oawc", total: 10, delay: 1000},
+     {name: "tldo", total: 8, delay: 800},
+     {name: "stld", total: 4, delay: 1200}]
+];
+
 
 /* Entry point */
 window.onload = function() {
@@ -42,8 +77,8 @@ Crafty.c("tCreep", {
         this.h = Game.size;
 
         //Put in position
-        this.x = Game.path[0].x;
-        this.y = Game.path[0].y;
+        this.x = Game.path[0][0];
+        this.y = Game.path[0][1];
         this.nextPoint = 1;
     },
 
@@ -61,18 +96,18 @@ Crafty.c("tCreep", {
         var point = Game.path[this.nextPoint];
 
         //Advance to the next point (TODO: precalculate and store)
-        var dx = point.x - this.x;
-        var dy = point.y - this.y;
+        var dx = point[0] - this.x;
+        var dy = point[1] - this.y;
         var angle = Math.atan2(dy, dx); // * 180 / Math.PI; // (r * 180 / pi)
-
         this.x += this.speed * Math.cos(angle);
         this.y += this.speed * Math.sin(angle);
 
         //this.rotation = angle;
         //console.log("a:", angle, "x,y:", this.x, this.y, "dx,dy:", dx, dy, point);
 
-        if (this.intersect(point)) {
+        if (this.intersect({x: point[0], y: point[1], h: Game.size / 6, w: Game.size / 6})) {
             this.nextPoint++;
+            console.info("Creep '%s' arrived path point %s/%s", this.name, this.nextPoint, Game.path.length);
 
             // Creep reached end of the path
             if (this.nextPoint == Game.path.length) {
@@ -95,13 +130,12 @@ Crafty.scene("loading", function() {
                      .text("Loading...")
                      .textColor('#FFFFFF')
 
-    //Create path
-    for (i in Game._path) {
-        var point = Game._path[i];
-        point = Crafty.e("2D, Canvas, Color, tPoint")
-                      .attr({x: point[0], y: point[1], w: 5, h: 5})
-                      .color("#ffffff"); //debug mode
-        Game.path.push(point);
+    //Debug path drawing
+    for (i in Game.path) {
+        var point = Game.path[i];
+        Crafty.e("2D, Canvas, Color, tPoint")
+              .attr({x: point[0], y: point[1], w: 5, h: 5})
+              .color("#ffffff");
     }
 
     //Create creep
@@ -145,17 +179,40 @@ Crafty.scene("loading", function() {
 /**
  * Helpers
  */
-function sendCreep(creepData, number, delay) {
-    if (typeof number == "undefined") number = 1;
+function sendWave() {
+    console.info("Sending wave %s", Game.wave_num);
+    var time = 0; // accumaltive wave time
 
-    console.info("Sending %s creeps...", number, creepData);
+    for (i in Game.waves[Game.wave_num]) { // Iterate current wave
+        var _sub = Game.waves[Game.wave_num][i];
+
+        Crafty.e("Delay").delay(function() {
+            var sub = Game.waves[Game.wave_num][Game.wave_sub]; //internal subwave
+            console.info("Wave %s, sub %s", Game.wave_num, Game.wave_sub, sub);
+            sendCreep(sub.name, sub.total, sub.delay);
+            Game.wave_sub++;
+        }, time, 0, function() {
+            if (Game.wave_sub == Game.waves[Game.wave_num].length) {
+                console.info("End of wave %s", Game.wave_num);
+                Game.wave_sub = 0;
+                Game.wave_num++;
+            }
+        });
+
+        time += _sub.delay * _sub.total;
+    }
+}
+
+function sendCreep(name, total, delay) {
+    console.info("Sending %s creeps...", total, name);
 
     Crafty.e("Delay").delay(function() {
-        Crafty.e("tCreep").creep(creepData);
-    }, delay, number, function() {
-        console.info("Done sending %s", number, creepData);
+        Crafty.e("tCreep").creep(Game.creeps[name]);
+    }, delay, total - 1, function() {
+        console.info("Done sending %s", total, name);
     });
 }
+
         </script>
     </body>
 </html>
