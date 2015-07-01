@@ -372,6 +372,13 @@ function loadMap() {
 
 function creepLeaked(creep) {
     Game.lives -= creep.lives;
+
+    //Game over?
+    if (Game.lives <= 0) {
+        Game.lives = 0;
+        alert("CRAP!");
+    }
+
     updateHud();
 
     //Bye
