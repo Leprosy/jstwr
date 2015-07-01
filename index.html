@@ -20,6 +20,7 @@
 /* Some parameters */
 var Game = {};
 Game.size = 32;
+Game.playing = false;
 Game.version = 0.001;
 
 
@@ -47,10 +48,6 @@ Crafty.c("tTower", {
     },
 
     tower: function(data, x, y) {
-        /* this.name = obj.name;
-        this.color(obj.color);
-        this.range = obj.range;
-        this.damage = obj.damage; */
         extend(this, data);
         this.color(data.__color); //DEBUG!!
         this.x = x;
@@ -200,17 +197,21 @@ Crafty.scene("main", function() {
 
     //Load map
     loadMap();
+    updateHud();
 
     //Debug path & towerArea drawing
     debugDrawing();
 
-    //Tower areas click entities
+    //Tower areas click entities (MOVE TO LOAD MAP??)
     for (i in Game.towerAreas) {
         Crafty.e("2D, Mouse, tTowerArea")
               .attr({x: 0, y: 0, w: Game.size * 20, h: Game.size * 20})
               .bind("Click", function(ev) { buyTower(ev) })
               .areaMap(new Crafty.polygon(Game.towerAreas[i]));
     }
+
+    //Game started!
+    Game.playing = true;
 
     /* Loader...not yet
     var loadObj = {
@@ -249,10 +250,15 @@ Crafty.scene("main", function() {
 });
 
 
+
+
+
 /**
- * Helpers
+ * Methods, Helpers and whatnot
  */
 function sendWave() {
+    if (!Game.playing) return;
+
     console.info("Sending wave %s", Game.wave_num);
     var time = 0; // accumaltive wave time
 
@@ -279,6 +285,8 @@ function sendWave() {
 }
 
 function sendCreep(name, total, delay) {
+    if (!Game.playing) return;
+
     console.info("Sending %s creeps...", total, name);
 
     Crafty.e("Delay").delay(function() {
@@ -289,6 +297,8 @@ function sendCreep(name, total, delay) {
 }
 
 function buyTower(ev) {
+    if (!Game.playing) return;
+
     var towername = "one";
     var tower = Game.towers[towername];
     console.info("Buying tower %s-%s at", towername, tower.name, ev);
@@ -367,10 +377,11 @@ function loadMap() {
     ];
 
     extend(Game, data);
-    updateHud();
 }
 
 function creepLeaked(creep) {
+    if (!Game.playing) return;
+
     Game.lives -= creep.lives;
 
     //Game over?
@@ -386,6 +397,8 @@ function creepLeaked(creep) {
 }
 
 function creepDestroyed(source, creep) {
+    if (!Game.playing) return;
+
     source.kills++;
     Game.money += creep.money;
     updateHud();
