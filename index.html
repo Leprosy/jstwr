@@ -8,6 +8,8 @@
     </head>
     <body>
         <div id="game"></div>
+        <button onclick="Crafty.scene('main')">Start</button>
+        <button onclick="sendWave()">Next wave</button>
 
         <script>
 /**
@@ -19,46 +21,10 @@ var Game = {};
 Game.size = 32;
 Game.version = 0.001;
 
-/**
- * This is level data. Must be loaded from a JSON file/service
- */
-Game.wave_num = 0;
-Game.wave_sub = 0;
-Game.path = [[50, 0], [200, 200], [350, 200], [0, 400]]; //Loaded from JSON
-Game.creeps = { //Loaded from JSON
-    "oawc": {
-        name: "Oaw",
-        hp: 20,
-        speed: 1,
-        color: "#ff0000"
-    },
-    "tldo": {
-        name: "Taldo",
-        hp: 40,
-        speed: 2,
-        color: "#ffff00"
-    },
-    "stld": {
-        name: "Super Taldo",
-        hp: 80,
-        speed: 3,
-        color: "#0000ff"
-    },
-};
-Game.waves = [ //Loaded from JSON
-    [{name: "oawc", total: 6, delay: 1000},
-     {name: "tldo", total: 5, delay: 800}],
-    
-    [{name: "oawc", total: 10, delay: 1000},
-     {name: "tldo", total: 8, delay: 800},
-     {name: "stld", total: 4, delay: 1200}]
-];
-
 
 /* Entry point */
 window.onload = function() {
     Crafty.init(Game.size * 20, Game.size * 20, "game");
-    Crafty.background("#002200");
     Crafty.scene("loading");
 };
 
@@ -68,6 +34,101 @@ window.onload = function() {
 /*
  * Components
  */
+Crafty.c("tTower", {
+    init: function() {
+        //Setup
+        this.addComponent("2D, Canvas, Color");
+        this.origin("center");
+        this.w = Game.size;
+        this.h = Game.size;
+        this.kills = 0;
+        this.cooldown = 0;
+    },
+
+    tower: function(obj, x, y) {
+        this.name = obj.name;
+        this.color(obj.color);
+        this.range = obj.range;
+        this.damage = obj.damage;
+        this.x = x;
+        this.y = y;
+
+        //Seek and destroy
+        this.bind("EnterFrame", this.update);
+    },
+
+    update: function() {
+        // Cooldown gun and fire bullets
+        if (this.cooldown == 0) {
+            this.cooldown = 40; // CHeck this from json data
+            this.fireNearest();
+            this.firing = true;
+        } else {
+            this.cooldown--;
+        }
+    },
+
+    fireNearest: function() {
+        var creeps = Crafty("tCreep").get();
+        var min = 999999;
+        var theCreep = false;
+
+        for (i in creeps) {
+            var creep = creeps[i];
+            var dist = Crafty.math.squaredDistance(this.x, this.y, creep.x, creep.y);
+
+            if (dist < min && Math.sqrt(dist) <= this.range) {
+                min = dist;
+                theCreep = creep;
+            }
+        }
+
+        if (theCreep) {
+            this.firing = true;
+            Crafty.e("tBullet").bullet(this, theCreep);
+        }
+
+    }
+});
+
+Crafty.c("tBullet", {
+    init: function() {
+        //Setup
+        this.addComponent("2D, Canvas, Color");
+        this.origin("center");
+        this.w = 2;
+        this.h = 2;
+        this.speed = 4;
+        this.color("#444400");
+    },
+
+    bullet: function(source, target) {
+        this.source = source;
+        this.x = source.x;
+        this.y = source.y;
+        this.target = target;
+        this.bind("EnterFrame", this.update);
+    },
+
+    //Seek bullet
+    update: function() {
+        var angle = getAngle(this.target.x, this.target.y, this.x, this.y);
+        this.x += this.speed * Math.cos(angle);
+        this.y += this.speed * Math.sin(angle);
+
+        if (this.intersect(this.target)) {
+            this.target.hp -= this.source.damage;
+
+            // Check if creep is destroyed
+            if (this.target.hp <= 0) {
+                this.target.destroy();
+            }
+
+            this.destroy();
+        }
+    }
+});
+
 Crafty.c("tCreep", {
     init: function() {
         //Setup
@@ -86,9 +147,10 @@ Crafty.c("tCreep", {
         this.name = data.name;
         this.speed = data.speed;
         this.color(data.color);
+        this.hp = data.hp;
 
         //Start moving
-        this.bind('EnterFrame', this.update);
+        this.bind("EnterFrame", this.update);
         console.info("Creep '%s' released", this.name);
     },
 
@@ -96,14 +158,9 @@ Crafty.c("tCreep", {
         var point = Game.path[this.nextPoint];
 
         //Advance to the next point (TODO: precalculate and store)
-        var dx = point[0] - this.x;
-        var dy = point[1] - this.y;
-        var angle = Math.atan2(dy, dx); // * 180 / Math.PI; // (r * 180 / pi)
+        var angle = getAngle(point[0], point[1], this.x, this.y);
         this.x += this.speed * Math.cos(angle);
         this.y += this.speed * Math.sin(angle);
-
-        //this.rotation = angle;
-        //console.log("a:", angle, "x,y:", this.x, this.y, "dx,dy:", dx, dy, point);
 
         if (this.intersect({x: point[0], y: point[1], h: Game.size / 6, w: Game.size / 6})) {
             this.nextPoint++;
@@ -126,19 +183,30 @@ Crafty.c("tCreep", {
  */
 // The loading screen
 Crafty.scene("loading", function() {
+    Crafty.background("#000000");
+
     var text = Crafty.e("2D, Canvas, Text").attr({w: 0, h: 0, x: 0, y: 0})
                      .text("Loading...")
-                     .textColor('#FFFFFF')
+                     .textColor('#FFFFFF');
+});
 
-    //Debug path drawing
-    for (i in Game.path) {
-        var point = Game.path[i];
-        Crafty.e("2D, Canvas, Color, tPoint")
-              .attr({x: point[0], y: point[1], w: 5, h: 5})
-              .color("#ffffff");
+Crafty.scene("main", function() {
+    Crafty.background("#002200");
+
+    //Load map
+    loadMap();
+
+    //Debug path & towerArea drawing
+    debugDrawing();
+
+    //Tower areas click entities
+    for (i in Game.towerAreas) {
+        Crafty.e("2D, Mouse, tTowerArea")
+              .attr({x: 0, y: 0, w: Game.size * 20, h: Game.size * 20})
+              .bind("Click", function(ev) { buyTower(ev) })
+              .areaMap(new Crafty.polygon(Game.towerAreas[i]));
     }
 
-    //Create creep
     /* Loader...not yet
     var loadObj = {
         "audio": {
@@ -211,6 +279,108 @@ function sendCreep(name, total, delay) {
     }, delay, total - 1, function() {
         console.info("Done sending %s", total, name);
     });
+}
+
+function buyTower(ev) {
+    
+    var towername = "one";
+    var tower = Game.towers[towername];
+    console.info("Buying tower %s-%s at", towername, tower.name, ev);
+
+    if (Game.money >= tower.money) {
+        Game.money -= tower.money;
+        var entity = Crafty.e("tTower").tower(tower, ev.realX, ev.realY);
+    } else {
+        console.info("No money");
+    }
+}
+/**
+ * This is level data. Must be loaded from a JSON file/service/whatever
+ */
+function loadMap() {
+    Game.money = 500;
+    Game.lives = 20;
+    Game.wave_num = 0;
+    Game.wave_sub = 0;
+    Game.path = [[50, 0], [200, 200], [350, 200], [0, 400]]; //Loaded from JSON
+    Game.towerAreas = [ [[50, 50], [150, 50], [100, 100]],
+                        [[340, 50], [300, 150], [500, 150], [450, 50]] ];
+    Game.creeps = { //Loaded from JSON
+        "oawc": {
+            name: "Oaw",
+            hp: 15,
+            speed: 1,
+            color: "#ff0000",
+            money: 1,
+            lives: 1
+        },
+        "tldo": {
+            name: "Taldo",
+            hp: 40,
+            speed: 2,
+            color: "#ffff00",
+            money: 2,
+            lives: 2
+        },
+        "stld": {
+            name: "Super Taldo",
+            hp: 80,
+            speed: 3,
+            color: "#0000ff",
+            money: 3,
+            lives: 3
+        },
+    };
+    Game.towers = { //Loaded from JSON
+        "one": {
+            name: "Tower 1",
+            damage: 5,
+            color: "#f0f0f0",
+            money: 200,
+            range: 200
+        },
+        "two": {
+            name: "Tower 2",
+            damage: 15,
+            color: "#0ff3fa",
+            money: 400,
+            range: 300
+        }
+    };
+    Game.waves = [ //Loaded from JSON
+        [{name: "oawc", total: 4, delay: 2000},
+         {name: "tldo", total: 1, delay: 800}],
+
+        [{name: "oawc", total: 10, delay: 1000},
+         {name: "tldo", total: 8, delay: 800},
+         {name: "stld", total: 4, delay: 1200}]
+    ];
+}
+
+function getAngle(x1, y1, x2, y2) {
+    var dx = x1 - x2;
+    var dy = y1 - y2;
+
+    return Math.atan2(dy, dx);
+}
+
+function debugDrawing() {
+    for (i in Game.path) {
+        var point = Game.path[i];
+        Crafty.e("2D, Canvas, Color, tPoint")
+              .attr({x: point[0], y: point[1], w: 5, h: 5})
+              .color("#ffffff");
+    }
+    for (i in Game.towerAreas) {
+        var points = Game.towerAreas[i];
+
+        for (j in points) {
+            var point = points[j];
+            Crafty.e("2D, Canvas, Color, tPoint")
+                  .attr({x: point[0], y: point[1], w: 5, h: 5})
+                  .color("#ff00ff");
+        }
+    }
 }
 
         </script>
