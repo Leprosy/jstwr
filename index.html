@@ -11,6 +11,7 @@
         <button onclick="Crafty.scene('main')">Start</button>
         <button onclick="sendWave()">Next wave</button>
 
+        <input type="text" disabled="true" size="100" id="hud" />
         <script>
 /**
  * Game logic 
@@ -45,11 +46,13 @@ Crafty.c("tTower", {
         this.cooldown = 0;
     },
 
-    tower: function(obj, x, y) {
-        this.name = obj.name;
+    tower: function(data, x, y) {
+        /* this.name = obj.name;
         this.color(obj.color);
         this.range = obj.range;
-        this.damage = obj.damage;
+        this.damage = obj.damage; */
+        extend(this, data);
+        this.color(data.__color); //DEBUG!!
         this.x = x;
         this.y = y;
 
@@ -96,6 +99,8 @@ Crafty.c("tBullet", {
         //Setup
         this.addComponent("2D, Canvas, Color");
         this.origin("center");
+
+        //This should be copied from the source tower??
         this.w = 2;
         this.h = 2;
         this.speed = 4;
@@ -104,14 +109,15 @@ Crafty.c("tBullet", {
 
     bullet: function(source, target) {
         this.source = source;
+        this.target = target;
         this.x = source.x;
         this.y = source.y;
-        this.target = target;
         this.bind("EnterFrame", this.update);
     },
 
-    //Seek bullet
     update: function() {
+        // This should be refactored in several functions, each one controlling 
+        // one type of bullet. This is for "Seeking bullet"
         var angle = getAngle(this.target.x, this.target.y, this.x, this.y);
         this.x += this.speed * Math.cos(angle);
         this.y += this.speed * Math.sin(angle);
@@ -121,13 +127,14 @@ Crafty.c("tBullet", {
 
             // Check if creep is destroyed
             if (this.target.hp <= 0) {
-                this.target.destroy();
+                creepDestroyed(this.source, this.target);
             }
 
             this.destroy();
         }
     }
 });
+
 
 Crafty.c("tCreep", {
     init: function() {
@@ -144,10 +151,8 @@ Crafty.c("tCreep", {
     },
 
     creep: function(data) {
-        this.name = data.name;
-        this.speed = data.speed;
-        this.color(data.color);
-        this.hp = data.hp;
+        extend(this, data);
+        this.color(data.__color); // this is debug only
 
         //Start moving
         this.bind("EnterFrame", this.update);
@@ -169,7 +174,7 @@ Crafty.c("tCreep", {
             // Creep reached end of the path
             if (this.nextPoint == Game.path.length) {
                 console.info("Creep '%s' leaked", this.name);
-                this.destroy();
+                creepLeaked(this);
             }
         }
     }
@@ -269,6 +274,8 @@ function sendWave() {
 
         time += _sub.delay * _sub.total;
     }
+
+    updateHud();
 }
 
 function sendCreep(name, total, delay) {
@@ -282,7 +289,6 @@ function sendCreep(name, total, delay) {
 }
 
 function buyTower(ev) {
-    
     var towername = "one";
     var tower = Game.towers[towername];
     console.info("Buying tower %s-%s at", towername, tower.name, ev);
@@ -293,24 +299,28 @@ function buyTower(ev) {
     } else {
         console.info("No money");
     }
+
+    updateHud();
 }
-/**
- * This is level data. Must be loaded from a JSON file/service/whatever
- */
+
 function loadMap() {
-    Game.money = 500;
-    Game.lives = 20;
-    Game.wave_num = 0;
-    Game.wave_sub = 0;
-    Game.path = [[50, 0], [200, 200], [350, 200], [0, 400]]; //Loaded from JSON
-    Game.towerAreas = [ [[50, 50], [150, 50], [100, 100]],
+    /**
+     * This is level data. Must be loaded from a JSON file/service/whatever
+     */
+    var data = {};
+    data.money = 500;
+    data.lives = 20;
+    data.wave_num = 0;
+    data.wave_sub = 0;
+    data.path = [[50, 0], [200, 200], [350, 200], [0, 400]]; //Loaded from JSON
+    data.towerAreas = [ [[50, 50], [150, 50], [100, 100]],
                         [[340, 50], [300, 150], [500, 150], [450, 50]] ];
-    Game.creeps = { //Loaded from JSON
+    data.creeps = { //Loaded from JSON
         "oawc": {
             name: "Oaw",
             hp: 15,
             speed: 1,
-            color: "#ff0000",
+            __color: "#ff0000",
             money: 1,
             lives: 1
         },
@@ -318,7 +328,7 @@ function loadMap() {
             name: "Taldo",
             hp: 40,
             speed: 2,
-            color: "#ffff00",
+            __color: "#ffff00",
             money: 2,
             lives: 2
         },
@@ -326,28 +336,28 @@ function loadMap() {
             name: "Super Taldo",
             hp: 80,
             speed: 3,
-            color: "#0000ff",
+            __color: "#0000ff",
             money: 3,
             lives: 3
         },
     };
-    Game.towers = { //Loaded from JSON
+    data.towers = { //Loaded from JSON
         "one": {
             name: "Tower 1",
             damage: 5,
-            color: "#f0f0f0",
+            __color: "#f0f0f0",
             money: 200,
             range: 200
         },
         "two": {
             name: "Tower 2",
             damage: 15,
-            color: "#0ff3fa",
+            __color: "#0ff3fa",
             money: 400,
             range: 300
         }
     };
-    Game.waves = [ //Loaded from JSON
+    data.waves = [ //Loaded from JSON
         [{name: "oawc", total: 4, delay: 2000},
          {name: "tldo", total: 1, delay: 800}],
 
@@ -355,6 +365,31 @@ function loadMap() {
          {name: "tldo", total: 8, delay: 800},
          {name: "stld", total: 4, delay: 1200}]
     ];
+
+    extend(Game, data);
+    updateHud();
+}
+
+function creepLeaked(creep) {
+    Game.lives -= creep.lives;
+    updateHud();
+
+    //Bye
+    creep.destroy();
+}
+
+function creepDestroyed(source, creep) {
+    source.kills++;
+    Game.money += creep.money;
+    updateHud();
+
+    //Bye
+    creep.destroy();
+}
+
+function updateHud() {
+    var hud = "Money:" + Game.money + " Lives:" + Game.lives;
+    document.getElementById("hud").value = hud
 }
 
 function getAngle(x1, y1, x2, y2) {
@@ -380,6 +415,15 @@ function debugDrawing() {
                   .attr({x: point[0], y: point[1], w: 5, h: 5})
                   .color("#ff00ff");
         }
+    }
+}
+
+function extend(obj1, obj2) {
+    var keys = Object.keys(obj2);
+
+    for (i in keys) {
+        var key = keys[i];
+        obj1[key] = obj2[key];
     }
 }
 
